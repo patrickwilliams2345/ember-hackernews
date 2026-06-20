@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
 
     @State private var confirmClearRead = false
+    @State private var cacheSize = 0
 
     var body: some View {
         @Bindable var settings = settings
@@ -24,6 +25,7 @@ struct SettingsView: View {
             .tint(settings.accent.color)
             .labelStyle(SettingsLabelStyle())
             .environment(\.defaultMinListRowHeight, 46)
+            .task { cacheSize = await DiskCache.shared.sizeInBytes() }
         }
     }
 
@@ -134,6 +136,22 @@ struct SettingsView: View {
                 Spacer()
                 Text("\(bookmarks.items.count)")
                     .foregroundStyle(Theme.textSecondary)
+            }
+            HStack {
+                Label("Offline Cache", systemImage: "internaldrive")
+                Spacer()
+                Text(cacheSize.formatted(.byteCount(style: .file)))
+                    .foregroundStyle(Theme.textSecondary)
+                    .monospacedDigit()
+            }
+            Button(role: .destructive) {
+                Task {
+                    await DiskCache.shared.clear()
+                    cacheSize = 0
+                    Haptics.warning()
+                }
+            } label: {
+                Label("Clear Offline Cache", systemImage: "trash")
             }
         }
     }

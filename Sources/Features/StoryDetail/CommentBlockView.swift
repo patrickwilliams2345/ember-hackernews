@@ -12,6 +12,7 @@ struct CommentBlockView: View {
         case .text(let attributed):
             Text(styled(attributed))
                 .font(AppFont.comment)
+                .lineSpacing(AppFont.readingLineSpacing)
                 .foregroundStyle(Theme.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -23,6 +24,7 @@ struct CommentBlockView: View {
                     .frame(width: 3)
                 Text(attributed)
                     .font(AppFont.comment.italic())
+                    .lineSpacing(AppFont.readingLineSpacing)
                     .foregroundStyle(Theme.textSecondary)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)

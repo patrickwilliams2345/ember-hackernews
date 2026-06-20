@@ -25,6 +25,9 @@ struct StoryDetailView: View {
                 header
                 commentsSection
             }
+            // Keep a comfortable reading measure on wide (desktop) windows.
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
         }
         .background(Theme.background)
         .navigationTitle(story.host ?? "Discussion")
@@ -45,7 +48,7 @@ struct StoryDetailView: View {
             }
 
             Text(story.displayTitle)
-                .font(.system(.title2, design: .default).weight(.bold))
+                .font(AppFont.articleTitle)
                 .foregroundStyle(Theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -220,6 +223,14 @@ struct StoryDetailView: View {
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
+            ShareLink(item: story.articleURL ?? story.hnURL,
+                      subject: Text(story.displayTitle),
+                      message: Text(story.hnURL.absoluteString)) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share")
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             Button {
                 let saved = bookmarks.toggle(story)
                 Haptics.soft()
@@ -236,9 +247,6 @@ struct StoryDetailView: View {
                 }
                 Button { openURL(story.hnURL) } label: {
                     Label("Open in Hacker News", systemImage: "globe")
-                }
-                ShareLink(item: story.articleURL ?? story.hnURL) {
-                    Label("Share", systemImage: "square.and.arrow.up")
                 }
                 Button {
                     UIPasteboard.general.url = story.articleURL ?? story.hnURL

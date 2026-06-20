@@ -40,6 +40,9 @@ struct OnboardingView: View {
                 .padding(.horizontal, Spacing.xl)
                 .padding(.bottom, Spacing.l)
         }
+        // Keep the flow a comfortable reading width on large (Mac) windows.
+        .frame(maxWidth: 620)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.background.ignoresSafeArea())
         .tint(settings.accent.color)
         .preferredColorScheme(settings.appearance.colorScheme)

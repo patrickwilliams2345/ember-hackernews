@@ -2,13 +2,15 @@
 
 # Ember
 
-**A native Hacker News reader for iOS — calm, fast, and built for everyone.**
+**A native Hacker News reader for iPhone, iPad, and Mac — calm, fast, and built for everyone.**
 
-Ember is a SwiftUI app that reads Hacker News the way a native iOS app should:
-threaded comments rendered natively, a personalized first-run setup, full
-dark mode, and accessibility treated as a feature rather than an afterthought.
+Ember is a SwiftUI app that reads Hacker News the way a native app should:
+threaded comments rendered natively, clean reading typography, a personalized
+first-run setup, full dark mode, offline reading, and accessibility treated as a
+feature rather than an afterthought. One codebase adapts from a tab bar on
+iPhone to a three-pane layout on Mac and iPad.
 
-![Platform](https://img.shields.io/badge/platform-iOS%2018%2B-black)
+![Platform](https://img.shields.io/badge/platform-iPhone%20%C2%B7%20iPad%20%C2%B7%20Mac-black)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![SwiftUI](https://img.shields.io/badge/UI-SwiftUI-blue)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
@@ -27,8 +29,12 @@ dark mode, and accessibility treated as a feature rather than an afterthought.
 - **Smart onboarding** — a short first-run flow that reads your device's appearance and accessibility settings, pre-configures the app to match, and shows a live preview as you choose a theme, accent, and home feed.
 - **Search** — full-text search across Hacker News by relevance or recency.
 - **Saved for later** — bookmark any story; saved stories are stored on device and work offline.
+- **Offline reading** — feeds, stories, and comment threads you've viewed are cached to disk, so Ember keeps working without a connection and falls back to the cache automatically. Cache size is shown in Settings and can be cleared.
 - **Read tracking** — visited stories are dimmed so you can pick up where you left off.
+- **Runs on the desktop** — the same app runs on Mac (via Mac Catalyst) and large iPad with a native three-pane layout: a source-list sidebar, a story list, and the discussion side by side.
+- **Reading typography** — body and comments are set in Inter with comfortable leading and a constrained measure, so long threads are easy to read.
 - **In-app reading** — open links in an in-app Safari view with optional Reader mode, or hand off to your default browser.
+- **Share** — a standard share button on every story (article or discussion link).
 - **Profiles** — view any user's karma, join date, about, and recent submissions.
 - **Thoughtful design** — a warm, hand-tuned color system, full light/dark support, six accent themes, haptics, and fluid animations.
 
@@ -58,10 +64,11 @@ Accessibility is a first-class part of Ember, with particular care for color vis
 
 Ember is pure SwiftUI with no third-party dependencies.
 
-- **UI:** SwiftUI, targeting iOS 18.
+- **UI:** SwiftUI, targeting iOS 18, with a Mac build via Mac Catalyst. The root layout adapts on horizontal size class: a `TabView` on iPhone, a three-column `NavigationSplitView` on Mac and regular-width iPad.
 - **State:** the Observation framework (`@Observable`) for view models and stores.
 - **Concurrency:** `async`/`await` networking; feed pages fetch concurrently with `TaskGroup` and tolerate individual missing items.
-- **Persistence:** `UserDefaults` for settings and read state; a JSON file for saved stories.
+- **Persistence & offline:** `UserDefaults` for settings and read state; a JSON file for saved stories; a bounded JSON disk cache (`DiskCache`, an `actor`) that stores feed lists, items, and comment trees and is served as a fallback when the network is unavailable.
+- **Typography:** the bundled Inter variable font for reading text, scaled with Dynamic Type; the system font for dense metadata and code.
 - **Data sources:**
   - The official [Hacker News Firebase API](https://github.com/HackerNews/API) for feeds, items, and users.
   - The [Algolia HN Search API](https://hn.algolia.com/api) for full comment trees (one request per thread) and search.
@@ -84,7 +91,8 @@ Sources/
     Settings/       Appearance, reading, accessibility, data, about
     User/           Profiles
     Onboarding/     Smart first-run personalization
-Resources/          Assets, app icon, Info.plist
+    Desktop/        NavigationSplitView layout for Mac / large iPad
+Resources/          Assets, app icon, Info.plist, bundled Inter font
 Tools/              Icon generator, screenshot device-framer
 ```
 
@@ -111,9 +119,15 @@ Or build from the command line:
 
 ```bash
 xcodegen generate
+
+# iPhone / iPad simulator
 xcodebuild -project Ember.xcodeproj -scheme Ember \
   -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+
+# Mac (Mac Catalyst)
+xcodebuild -project Ember.xcodeproj -scheme Ember \
+  -destination 'platform=macOS,variant=Mac Catalyst' build
 ```
 
 The generated `Ember.xcodeproj` is intentionally git-ignored — regenerate it with `xcodegen generate` after pulling.

@@ -38,14 +38,16 @@ final class LiveHNService: HNServicing {
     private let firebaseBase = "https://hacker-news.firebaseio.com/v0"
     private let algoliaBase = "https://hn.algolia.com/api/v1"
     private let session: URLSession
+    private let cache = DiskCache.shared
 
     init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 20
-        config.timeoutIntervalForResource = 40
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
         config.urlCache = URLCache(memoryCapacity: 16 << 20, diskCapacity: 64 << 20)
         config.requestCachePolicy = .reloadRevalidatingCacheData
-        config.waitsForConnectivity = true
+        // Fail fast when offline so we can fall back to the disk cache promptly.
+        config.waitsForConnectivity = false
         session = URLSession(configuration: config)
     }
 
@@ -57,6 +59,9 @@ final class LiveHNService: HNServicing {
     }
 
     private func get<T: Decodable>(_ urlString: String, decoder: JSONDecoder) async throws -> T {
+        #if DEBUG
+        if LaunchArgs.forceOffline { throw HNError.transport(URLError(.notConnectedToInternet)) }
+        #endif
         guard let url = URL(string: urlString) else { throw HNError.invalidURL }
         let data: Data
         let response: URLResponse
@@ -76,11 +81,27 @@ final class LiveHNService: HNServicing {
     }
 
     func storyIDs(for feed: Feed) async throws -> [Int] {
-        try await get("\(firebaseBase)/\(feed.endpoint).json", decoder: firebaseDecoder)
+        let key = "ids.\(feed.rawValue)"
+        do {
+            let ids: [Int] = try await get("\(firebaseBase)/\(feed.endpoint).json", decoder: firebaseDecoder)
+            await cache.store(ids, for: key)
+            return ids
+        } catch {
+            if let cached = await cache.load([Int].self, for: key) { return cached }
+            throw error
+        }
     }
 
     func item(_ id: Int) async throws -> HNItem {
-        try await get("\(firebaseBase)/item/\(id).json", decoder: firebaseDecoder)
+        let key = "item.\(id)"
+        do {
+            let item: HNItem = try await get("\(firebaseBase)/item/\(id).json", decoder: firebaseDecoder)
+            await cache.store(item, for: key)
+            return item
+        } catch {
+            if let cached = await cache.load(HNItem.self, for: key) { return cached }
+            throw error
+        }
     }
 
     /// Fetch many items concurrently, preserving the requested order and
@@ -108,7 +129,15 @@ final class LiveHNService: HNServicing {
     }
 
     func commentTree(for id: Int) async throws -> AlgoliaItem {
-        try await get("\(algoliaBase)/items/\(id)", decoder: algoliaDecoder)
+        let key = "tree.\(id)"
+        do {
+            let tree: AlgoliaItem = try await get("\(algoliaBase)/items/\(id)", decoder: algoliaDecoder)
+            await cache.store(tree, for: key)
+            return tree
+        } catch {
+            if let cached = await cache.load(AlgoliaItem.self, for: key) { return cached }
+            throw error
+        }
     }
 
     func search(_ query: String, mode: SearchMode, page: Int) async throws -> [SearchHit] {

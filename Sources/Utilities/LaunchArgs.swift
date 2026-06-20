@@ -16,5 +16,7 @@ enum LaunchArgs {
     static var query: String? { value("-uiQuery") }
     static var autoOpenFirst: Bool { flag("-uiAutoOpenFirst") }
     static var onboardingStep: Int? { value("-uiOnboardingStep").flatMap(Int.init) }
+    /// Simulates being offline so the disk-cache fallback can be exercised.
+    static var forceOffline: Bool { flag("-uiForceOffline") }
 }
 #endif

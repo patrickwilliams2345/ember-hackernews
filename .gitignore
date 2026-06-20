@@ -17,3 +17,6 @@ xcuserdata/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Personal drafts — never commit
+HN_SUBMISSION.txt
