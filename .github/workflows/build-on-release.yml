@@ -23,6 +23,9 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -32,6 +35,35 @@ jobs:
       - name: Resolve Swift package dependencies
         run: xcodebuild -resolvePackageDependencies -project Ember.xcodeproj -scheme Ember
 
+      # ── iOS build ──
+      - name: Build iOS app (no code signing)
+        run: |
+          xcodebuild \
+            -project Ember.xcodeproj \
+            -scheme Ember \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM= \
+            clean build
+
+      - name: Locate iOS app
+        id: ios-app
+        run: |
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Release-iphoneos*' | head -1)
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          echo "Found iOS app at: $APP_PATH"
+
+      - name: Zip iOS app
+        run: |
+          cd "$(dirname "$IOS_APP_PATH")"
+          zip -r "Ember-iOS-${{ github.event.release.tag_name }}.zip" Ember.app
+          echo "IOS_ZIP_PATH=$(pwd)/Ember-iOS-${{ github.event.release.tag_name }}.zip" >> "$GITHUB_ENV"
+        env:
+          IOS_APP_PATH: ${{ steps.ios-app.outputs.app_path }}
+
+      # ── Mac Catalyst build ──
       - name: Build Mac Catalyst app (no code signing)
         run: |
           xcodebuild \
@@ -44,30 +76,43 @@ jobs:
             DEVELOPMENT_TEAM= \
             clean build
 
-      - name: Locate built app
-        id: app
+      - name: Locate Catalyst app
+        id: catalyst-app
         run: |
-          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Build/Products*' | head -1)
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Release-maccatalyst*' | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Build/Products*' | grep -v iphoneos | head -1)
+          fi
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
-          echo "Found app at: $APP_PATH"
+          echo "Found Catalyst app at: $APP_PATH"
 
-      - name: Zip app
+      - name: Zip Catalyst app
         run: |
-          cd "$(dirname "$APP_PATH")"
-          zip -r "Ember-${{ github.event.release.tag_name }}.zip" Ember.app
-          echo "ZIP_PATH=$(pwd)/Ember-${{ github.event.release.tag_name }}.zip" >> "$GITHUB_ENV"
+          cd "$(dirname "$CATALYST_APP_PATH")"
+          zip -r "Ember-macOS-${{ github.event.release.tag_name }}.zip" Ember.app
+          echo "CATALYST_ZIP_PATH=$(pwd)/Ember-macOS-${{ github.event.release.tag_name }}.zip" >> "$GITHUB_ENV"
         env:
-          APP_PATH: ${{ steps.app.outputs.app_path }}
+          CATALYST_APP_PATH: ${{ steps.catalyst-app.outputs.app_path }}
 
-      - name: Upload artifact
+      # ── Upload & release ──
+      - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ember-${{ github.event.release.tag_name }}
-          path: ${{ env.ZIP_PATH }}
+          name: Ember-iOS-${{ github.event.release.tag_name }}
+          path: ${{ env.IOS_ZIP_PATH }}
           retention-days: 30
 
-      - name: Attach zip to release
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ember-macOS-${{ github.event.release.tag_name }}
+          path: ${{ env.CATALYST_ZIP_PATH }}
+          retention-days: 30
+
+      - name: Attach zips to release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_PATH }}
+          files: |
+            ${{ env.IOS_ZIP_PATH }}
+            ${{ env.CATALYST_ZIP_PATH }}
           tag_name: ${{ github.event.release.tag_name }}
