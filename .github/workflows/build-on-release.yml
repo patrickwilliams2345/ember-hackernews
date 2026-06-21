@@ -1,0 +1,67 @@
+name: Build Ember on Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app || true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve Swift package dependencies
+        run: xcodebuild -resolvePackageDependencies -project Ember.xcodeproj -scheme Ember
+
+      - name: Build app (no code signing)
+        run: |
+          xcodebuild \
+            -project Ember.xcodeproj \
+            -scheme Ember \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM= \
+            clean build
+
+      - name: Locate built app
+        id: app
+        run: |
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Build/Products/Release-iphoneos*' | head -1)
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          echo "Found app at: $APP_PATH"
+
+      - name: Zip app
+        run: |
+          cd "$(dirname "$APP_PATH")"
+          zip -r "Ember-${{ github.event.release.tag_name }}.zip" Ember.app
+          echo "ZIP_PATH=$(pwd)/Ember-${{ github.event.release.tag_name }}.zip" >> "$GITHUB_ENV"
+        env:
+          APP_PATH: ${{ steps.app.outputs.app_path }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ember-${{ github.event.release.tag_name }}
+          path: ${{ env.ZIP_PATH }}
+          retention-days: 30
+
+      - name: Attach zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_PATH }}
+          tag_name: ${{ github.event.release.tag_name }}
