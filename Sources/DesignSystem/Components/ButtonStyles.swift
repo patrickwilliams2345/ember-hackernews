@@ -22,7 +22,7 @@ struct HighlightRowStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == CardButtonStyle {
-    static var card: CardButtonStyle { CardButtonStyle() }
+    static var cardPress: CardButtonStyle { CardButtonStyle() }
 }
 
 extension ButtonStyle where Self == HighlightRowStyle {

@@ -126,7 +126,7 @@ struct StoryDetailView: View {
                     .strokeBorder(Theme.separator, lineWidth: 1)
             )
         }
-        .buttonStyle(.card)
+        .buttonStyle(.cardPress)
         .accessibilityLabel("Read article from \(story.host ?? "link")")
         .accessibilityHint("Opens the linked page")
     }
@@ -165,7 +165,7 @@ struct StoryDetailView: View {
             .background(Theme.surfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
         }
-        .buttonStyle(.card)
+        .buttonStyle(.cardPress)
         .accessibilityLabel("Posted by \(story.author). View profile.")
     }
 
