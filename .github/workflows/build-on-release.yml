@@ -32,24 +32,22 @@ jobs:
       - name: Resolve Swift package dependencies
         run: xcodebuild -resolvePackageDependencies -project Ember.xcodeproj -scheme Ember
 
-      - name: Build app (no code signing)
+      - name: Build Mac Catalyst app (no code signing)
         run: |
           xcodebuild \
             -project Ember.xcodeproj \
             -scheme Ember \
             -configuration Release \
-            -sdk iphoneos \
-            -arch arm64 \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM= \
-            SUPPORTS_MACCATALYST=NO \
             clean build
 
       - name: Locate built app
         id: app
         run: |
-          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Build/Products/Release-iphoneos*' | head -1)
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Build/Products*' | head -1)
           echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
           echo "Found app at: $APP_PATH"
 
