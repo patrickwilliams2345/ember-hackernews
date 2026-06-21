@@ -39,9 +39,11 @@ jobs:
             -scheme Ember \
             -configuration Release \
             -sdk iphoneos \
+            -arch arm64 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM= \
+            SUPPORTS_MACCATALYST=NO \
             clean build
 
       - name: Locate built app
