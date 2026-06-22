@@ -3,6 +3,13 @@ name: Build Ember on Release
 on:
   release:
     types: [published]
+  push:
+    tags: ['*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (defaults to latest upstream release if empty)'
+        required: false
 
 permissions:
   contents: write
@@ -11,6 +18,23 @@ jobs:
   build:
     runs-on: macos-15
     steps:
+      - name: Resolve tag name
+        id: taginfo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ steps.taginfo.outputs.tag }}"
+          elif [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG=$(gh release view --repo DatanoiseTV/ember-hackernews --json tagName --jq .tagName)
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building tag: $TAG"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -56,7 +80,7 @@ jobs:
           APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Release-iphoneos*' | head -1)
           echo "Found iOS app at: $APP_PATH"
           cd "$(dirname "$APP_PATH")"
-          zip -r "$GITHUB_WORKSPACE/artifacts/Ember-iOS-${{ github.event.release.tag_name }}.zip" Ember.app
+          zip -r "$GITHUB_WORKSPACE/artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.zip" Ember.app
 
       # ── Mac Catalyst build ──
       - name: Build Mac Catalyst app (no code signing)
@@ -79,27 +103,27 @@ jobs:
           fi
           echo "Found Catalyst app at: $APP_PATH"
           cd "$(dirname "$APP_PATH")"
-          zip -r "$GITHUB_WORKSPACE/artifacts/Ember-macOS-${{ github.event.release.tag_name }}.zip" Ember.app
+          zip -r "$GITHUB_WORKSPACE/artifacts/Ember-macOS-${{ steps.taginfo.outputs.tag }}.zip" Ember.app
 
       # ── Upload & release ──
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ember-iOS-${{ github.event.release.tag_name }}
-          path: artifacts/Ember-iOS-${{ github.event.release.tag_name }}.zip
+          name: Ember-iOS-${{ steps.taginfo.outputs.tag }}
+          path: artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.zip
           retention-days: 30
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ember-macOS-${{ github.event.release.tag_name }}
-          path: artifacts/Ember-macOS-${{ github.event.release.tag_name }}.zip
+          name: Ember-macOS-${{ steps.taginfo.outputs.tag }}
+          path: artifacts/Ember-macOS-${{ steps.taginfo.outputs.tag }}.zip
           retention-days: 30
 
       - name: Attach zips to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/Ember-iOS-${{ github.event.release.tag_name }}.zip
-            artifacts/Ember-macOS-${{ github.event.release.tag_name }}.zip
-          tag_name: ${{ github.event.release.tag_name }}
+            artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.zip
+            artifacts/Ember-macOS-${{ steps.taginfo.outputs.tag }}.zip
+          tag_name: ${{ steps.taginfo.outputs.tag }}
