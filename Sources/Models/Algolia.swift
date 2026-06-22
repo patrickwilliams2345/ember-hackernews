@@ -92,6 +92,35 @@ struct SearchResponse: Codable {
     let hits: [SearchHit]
 }
 
+/// One of a user's comments, from Algolia's `search_by_date` with an author tag.
+struct UserComment: Identifiable, Hashable {
+    let id: Int
+    let html: String
+    let storyTitle: String?
+    let storyID: Int?
+    let date: Date?
+}
+
+struct AlgoliaCommentResponse: Codable {
+    let hits: [AlgoliaCommentHit]
+}
+
+struct AlgoliaCommentHit: Codable {
+    let objectID: String
+    var commentText: String?
+    var storyId: Int?
+    var storyTitle: String?
+    var createdAtI: Int?
+
+    var asUserComment: UserComment? {
+        guard let id = Int(objectID), let text = commentText, !text.isEmpty else { return nil }
+        return UserComment(
+            id: id, html: text, storyTitle: storyTitle, storyID: storyId,
+            date: createdAtI.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+        )
+    }
+}
+
 enum SearchMode: String, CaseIterable, Identifiable {
     case relevance, recent
     var id: String { rawValue }

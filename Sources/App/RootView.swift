@@ -83,8 +83,12 @@ struct RootView: View {
 /// iPhone layout: a tab bar with an independent navigation stack per tab.
 struct MobileRootView: View {
     @State private var selectedTab: Tab = .stories
+    @Environment(SettingsStore.self) private var settings
+    @Environment(AccountStore.self) private var account
 
-    enum Tab: Hashable { case stories, search, saved, settings }
+    enum Tab: Hashable { case stories, search, me, saved, settings }
+
+    private var showMe: Bool { settings.accountFeaturesEnabled && account.isSignedIn }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -94,6 +98,15 @@ struct MobileRootView: View {
             SearchView()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
+            if showMe, let username = account.username {
+                NavigationStack {
+                    UserView(username: username)
+                        .navigationDestination(for: HNItem.self) { StoryDetailView(item: $0) }
+                        .navigationDestination(for: UserRoute.self) { UserView(username: $0.username) }
+                }
+                .tabItem { Label("Me", systemImage: "person.crop.circle.fill") }
+                .tag(Tab.me)
+            }
             SavedView()
                 .tabItem { Label("Saved", systemImage: "bookmark.fill") }
                 .tag(Tab.saved)

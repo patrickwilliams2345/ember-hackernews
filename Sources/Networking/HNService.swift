@@ -27,6 +27,7 @@ protocol HNServicing {
     func user(_ id: String) async throws -> HNUser
     func commentTree(for id: Int) async throws -> AlgoliaItem
     func search(_ query: String, mode: SearchMode, page: Int) async throws -> [SearchHit]
+    func comments(byAuthor author: String, limit: Int) async throws -> [UserComment]
     func favoriteIDs(username: String) async throws -> [Int]
 }
 
@@ -152,6 +153,17 @@ final class LiveHNService: HNServicing {
         guard let url = components.url else { throw HNError.invalidURL }
         let response: SearchResponse = try await get(url.absoluteString, decoder: algoliaDecoder)
         return response.hits
+    }
+
+    func comments(byAuthor author: String, limit: Int) async throws -> [UserComment] {
+        var components = URLComponents(string: "\(algoliaBase)/search_by_date")!
+        components.queryItems = [
+            URLQueryItem(name: "tags", value: "comment,author_\(author)"),
+            URLQueryItem(name: "hitsPerPage", value: String(limit)),
+        ]
+        guard let url = components.url else { throw HNError.invalidURL }
+        let response: AlgoliaCommentResponse = try await get(url.absoluteString, decoder: algoliaDecoder)
+        return response.hits.compactMap(\.asUserComment)
     }
 
     /// HN favorites live only on the website (no API). Fetch the public favorites
