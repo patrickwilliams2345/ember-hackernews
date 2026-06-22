@@ -9,25 +9,60 @@ struct FeedChipBar: View {
 
     @Environment(SettingsStore.self) private var settings
 
+    private enum Edge: Hashable { case leading, trailing }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.s) {
+                    // Edge markers sit at the true content extremes so scrolling to
+                    // them lands at offset 0 / max with the padding intact, rather
+                    // than hugging a chip against the viewport edge. Width makes up
+                    // the horizontal padding minus the HStack's own leading gap.
+                    Color.clear.frame(width: Spacing.l - Spacing.s, height: 0).id(Edge.leading)
                     ForEach(Feed.allCases) { feed in
                         chip(feed)
                             .id(feed)
                     }
+                    Color.clear.frame(width: Spacing.l - Spacing.s, height: 0).id(Edge.trailing)
                 }
-                .padding(.horizontal, Spacing.l)
-                .padding(.vertical, Spacing.m)
+                .padding(.top, Spacing.xs)
+                .padding(.bottom, Spacing.s)
             }
+            // Selecting one of the first half scrolls fully left; the second half
+            // fully right. Deferred a runloop tick because the tap also mutates the
+            // view model (the feed reload churns layout), and a scroll issued in
+            // the same render pass gets dropped.
             .onChange(of: selection) { _, newValue in
-                withAnimation(.easeInOut) { proxy.scrollTo(newValue, anchor: .center) }
+                scroll(to: newValue, proxy: proxy, animated: true)
+            }
+            // A feed switch tears this bar down and rebuilds it (the phase swaps the
+            // list for a skeleton and back), resetting the scroll to offset 0. Each
+            // rebuild's onAppear re-pins the bar to the selection so the position
+            // survives the churn. Instant, since it's restoring an existing state.
+            .onAppear {
+                scroll(to: selection, proxy: proxy, animated: false)
             }
         }
         .background(.bar)
         .overlay(alignment: .bottom) {
             Divider().background(Theme.hairline)
+        }
+    }
+
+    /// First half of the chips scrolls the bar to its leading extreme, the second
+    /// half to its trailing extreme. Coarse by design — no need to center.
+    private func scrollEdge(for feed: Feed) -> Edge {
+        let index = Feed.allCases.firstIndex(of: feed) ?? 0
+        return index < Feed.allCases.count / 2 ? .leading : .trailing
+    }
+
+    private func scroll(to feed: Feed, proxy: ScrollViewProxy, animated: Bool) {
+        let edge = scrollEdge(for: feed)
+        DispatchQueue.main.async {
+            withAnimation(animated ? .easeInOut : nil) {
+                proxy.scrollTo(edge, anchor: edge == .leading ? .leading : .trailing)
+            }
         }
     }
 
