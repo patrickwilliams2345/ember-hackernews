@@ -41,6 +41,28 @@ struct SafariView: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
 
+// MARK: - Store re-injection for presented views
+
+/// Re-injects the app's Observation stores into a presented surface
+/// (sheet / full-screen cover). SwiftUI does not reliably propagate
+/// `@Observable` environment objects across a presentation boundary — most
+/// visibly on Mac Catalyst — so presented views that read them must have them
+/// re-supplied to avoid a fatal "missing environment" crash.
+struct AppStoresEnvironment: ViewModifier {
+    let settings: SettingsStore
+    let bookmarks: BookmarkStore
+    let readStore: ReadStore
+    let linkOpener: LinkOpener
+
+    func body(content: Content) -> some View {
+        content
+            .environment(settings)
+            .environment(bookmarks)
+            .environment(readStore)
+            .environment(linkOpener)
+    }
+}
+
 // MARK: - Environment actions
 
 extension EnvironmentValues {

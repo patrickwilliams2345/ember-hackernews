@@ -133,6 +133,27 @@ xcodebuild -project Ember.xcodeproj -scheme Ember \
 
 The generated `Ember.xcodeproj` is intentionally git-ignored — regenerate it with `xcodegen generate` after pulling.
 
+### Signing for device builds
+
+The simulator build above needs no signing. To build and run **signed code on a
+physical device** with a paid Apple Developer account, edit `project.yml` to use
+your own identifiers before regenerating the project:
+
+- Set `DEVELOPMENT_TEAM` to your 10-character Team ID (find it in Xcode ▸
+  Settings ▸ Accounts, or in the Apple Developer portal). It ships empty.
+- Change `options.bundleIdPrefix` and the target's `PRODUCT_BUNDLE_IDENTIFIER`
+  to a bundle ID you own (e.g. `com.yourname.ember`).
+
+`project.yml` does **not** force `CODE_SIGNING_ALLOWED`/`CODE_SIGNING_REQUIRED`
+to `NO`, so signing happens normally for device builds while the simulator build
+still works without any team set.
+
+After editing, regenerate the project:
+
+```bash
+xcodegen generate
+```
+
 ### Regenerating assets
 
 ```bash

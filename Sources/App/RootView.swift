@@ -1,10 +1,13 @@
 import SwiftUI
+import UIKit
 
 /// Adaptive root: a sidebar-driven split view on Mac and regular-width iPad,
 /// and a tab bar on iPhone. Shared app chrome (accent, color scheme, link
 /// handling, in-app browser, onboarding) is applied once here for both.
 struct RootView: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(BookmarkStore.self) private var bookmarks
+    @Environment(ReadStore.self) private var readStore
     @Environment(LinkOpener.self) private var linkOpener
     @Environment(\.openURL) private var systemOpenURL
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -20,7 +23,9 @@ struct RootView: View {
             }
         }
         .tint(settings.accent.color)
-        .preferredColorScheme(settings.appearance.colorScheme)
+        .onChange(of: settings.appearance, initial: true) { _, appearance in
+            applyInterfaceStyle(appearance.uiStyle)
+        }
         // Route explicit article opens through the in-app browser (or system).
         .environment(\.openArticle) { url in
             if settings.openLinksInApp {
@@ -42,7 +47,24 @@ struct RootView: View {
                 .ignoresSafeArea()
         }
         .fullScreenCover(isPresented: onboardingBinding) {
+            // Re-inject the Observation stores: presented views (full-screen
+            // cover / sheet) don't reliably inherit `@Observable` environment
+            // objects across the presentation boundary, which crashed the
+            // Mac Catalyst build on first launch (issue #1).
             OnboardingView()
+                .modifier(AppStoresEnvironment(settings: settings, bookmarks: bookmarks,
+                                               readStore: readStore, linkOpener: linkOpener))
+        }
+    }
+
+    /// Apply the chosen interface style to every window so System truly
+    /// follows the device and a forced Light/Dark reliably reverts.
+    private func applyInterfaceStyle(_ style: UIUserInterfaceStyle) {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows {
+                window.overrideUserInterfaceStyle = style
+            }
         }
     }
 

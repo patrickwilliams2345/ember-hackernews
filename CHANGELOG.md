@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-22
+
+### Fixed
+- Mac Catalyst no longer crashes on first launch from a missing `SettingsStore` in presented views (#1). The Observation stores are now re-injected across the onboarding full-screen cover and desktop Settings sheet boundaries.
+- Appearance reliably reverts to System after forcing Light or Dark, by driving the window's interface style directly (#9, thanks @gingerbeardman).
+- Search no longer flashes a transient error while typing when an in-flight request is superseded or cancelled (#10, thanks @gingerbeardman).
+
+### Added
+- Per-story thumbnail toggle (Show Story Thumbnails) in Settings and onboarding (#8, thanks @gingerbeardman; closes #7).
+
+### Changed
+- `project.yml` no longer forces code signing off, so device builds sign normally while simulator builds still work without a team; added a README signing section (#12, thanks @gingerbeardman; addresses #6).
+
 ## [1.2.0] - 2026-06-21
 
 ### Added
@@ -37,6 +50,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Accessibility: color-independent status cues, VoiceOver labels and custom actions, Dynamic Type, Reduce Motion support, and underlined links.
 - Six accent themes, full light/dark support, haptics, and a generated app icon.
 
+[1.3.0]: https://github.com/DatanoiseTV/ember-hackernews/releases/tag/v1.3.0
 [1.2.0]: https://github.com/DatanoiseTV/ember-hackernews/releases/tag/v1.2.0
 [1.1.0]: https://github.com/DatanoiseTV/ember-hackernews/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DatanoiseTV/ember-hackernews/releases/tag/v1.0.0
