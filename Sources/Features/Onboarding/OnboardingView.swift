@@ -7,6 +7,7 @@ import UIKit
 /// live preview — immediately.
 struct OnboardingView: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(AccountStore.self) private var account
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -14,8 +15,9 @@ struct OnboardingView: View {
     @State private var step = 0
     @State private var detected: [DetectedSetting] = []
     @State private var pulse = false
+    @State private var webTask: HNWebTask?
 
-    private let lastStep = 5
+    private let lastStep = 6
 
     var body: some View {
         @Bindable var settings = settings
@@ -31,7 +33,8 @@ struct OnboardingView: View {
                 accentStep($settings).tag(2)
                 accessibilityStep($settings).tag(3)
                 feedStep($settings).tag(4)
-                doneStep.tag(5)
+                accountStep.tag(5)
+                doneStep.tag(6)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.3), value: step)
@@ -50,6 +53,12 @@ struct OnboardingView: View {
             #if DEBUG
             if let seeded = LaunchArgs.onboardingStep { step = seeded }
             #endif
+        }
+        .sheet(item: $webTask) { task in
+            // Re-inject stores across the sheet boundary (issue #1).
+            HNWebSheet(task: task) { settings.accountFeaturesEnabled = true }
+                .environment(account)
+                .environment(settings)
         }
     }
 
@@ -266,7 +275,57 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: Step 5 — Done
+    // MARK: Step 5 — Account
+
+    private var accountStep: some View {
+        StepScaffold {
+            VStack(spacing: Spacing.xl) {
+                StepHeader(
+                    title: "Sign in to Hacker News",
+                    subtitle: "Optional. Sign in to upvote, comment, and submit — or skip and do it later in Settings."
+                )
+
+                ZStack {
+                    Circle()
+                        .fill(settings.accent.color.opacity(0.14))
+                        .frame(width: 116, height: 116)
+                    Image(systemName: account.isSignedIn ? "person.crop.circle.badge.checkmark" : "person.crop.circle")
+                        .font(.system(size: 54))
+                        .foregroundStyle(settings.accent.color)
+                }
+                .accessibilityHidden(true)
+
+                if account.isSignedIn {
+                    Label("Signed in as \(account.username ?? "you")", systemImage: "checkmark.seal.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.positive)
+                } else {
+                    Button {
+                        Haptics.tap()
+                        webTask = .login
+                    } label: {
+                        Label("Sign In Now", systemImage: "person.crop.circle.badge.plus")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(settings.accent.color)
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.m, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("Login happens on news.ycombinator.com in a secure web view — your password is never seen by Ember; only the session is stored in your device Keychain.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.l)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: Step 6 — Done
 
     private var doneStep: some View {
         StepScaffold {
@@ -297,6 +356,9 @@ struct OnboardingView: View {
             summaryChip(settings.appearance.systemImage, settings.appearance.title)
             summaryChip("paintpalette.fill", settings.accent.title)
             summaryChip(settings.defaultFeed.systemImage, settings.defaultFeed.title)
+            if account.isSignedIn {
+                summaryChip("person.crop.circle.fill", account.username ?? "Signed in")
+            }
         }
         .frame(maxWidth: 320)
     }

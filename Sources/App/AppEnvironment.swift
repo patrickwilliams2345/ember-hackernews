@@ -53,6 +53,7 @@ struct AppStoresEnvironment: ViewModifier {
     let bookmarks: BookmarkStore
     let readStore: ReadStore
     let linkOpener: LinkOpener
+    let account: AccountStore
 
     func body(content: Content) -> some View {
         content
@@ -60,6 +61,7 @@ struct AppStoresEnvironment: ViewModifier {
             .environment(bookmarks)
             .environment(readStore)
             .environment(linkOpener)
+            .environment(account)
     }
 }
 

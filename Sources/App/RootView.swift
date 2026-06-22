@@ -9,6 +9,7 @@ struct RootView: View {
     @Environment(BookmarkStore.self) private var bookmarks
     @Environment(ReadStore.self) private var readStore
     @Environment(LinkOpener.self) private var linkOpener
+    @Environment(AccountStore.self) private var account
     @Environment(\.openURL) private var systemOpenURL
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -53,7 +54,8 @@ struct RootView: View {
             // Mac Catalyst build on first launch (issue #1).
             OnboardingView()
                 .modifier(AppStoresEnvironment(settings: settings, bookmarks: bookmarks,
-                                               readStore: readStore, linkOpener: linkOpener))
+                                               readStore: readStore, linkOpener: linkOpener,
+                                               account: account))
         }
     }
 
