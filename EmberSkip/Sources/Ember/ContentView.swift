@@ -22,14 +22,12 @@ struct ContentView: View {
                 ToolbarItem {
                     Menu {
                         ForEach(HNFeed.allCases) { feed in
-                            Button {
+                            Button(feed.title) {
                                 Task { await viewModel.select(feed) }
-                            } label: {
-                                Label(feed.title, systemImage: feed.systemImage)
                             }
                         }
                     } label: {
-                        Label(viewModel.feed.title, systemImage: "line.3.horizontal.decrease.circle")
+                        Text(viewModel.feed.title).fontWeight(.semibold)
                     }
                 }
             }
@@ -55,9 +53,6 @@ struct ContentView: View {
 
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "wifi.exclamationmark")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
             Text("Couldn't load stories")
                 .font(.headline)
             Text(message)
@@ -97,10 +92,10 @@ struct StoryRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     if !story.isJob {
-                        Label("\(story.points)", systemImage: "arrow.up")
-                        Label("\(story.commentCount)", systemImage: "bubble.left")
+                        Text("▲ \(story.points)")
+                        Text("\(story.commentCount) comments")
                     }
                     Text("\(story.author) · \(story.relativeTime)")
                 }
@@ -127,8 +122,8 @@ struct StoryDetailView: View {
 
                 HStack(spacing: 16) {
                     if !story.isJob {
-                        Label("\(story.points)", systemImage: "arrow.up")
-                        Label("\(story.commentCount)", systemImage: "bubble.left")
+                        Text("▲ \(story.points)")
+                        Text("\(story.commentCount) comments")
                     }
                     Text(story.relativeTime)
                 }
@@ -143,7 +138,7 @@ struct StoryDetailView: View {
                     Button {
                         openURL(url)
                     } label: {
-                        Label(story.host ?? "Open Link", systemImage: "safari")
+                        Text("Open: \(story.host ?? "link")")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
