@@ -61,6 +61,20 @@ final class SettingsStore {
     var showThumbnails: Bool {
         didSet { store(showThumbnails, .showThumbnails) }
     }
+    /// Opt-in: enable signing in to a Hacker News account for voting, commenting
+    /// and submitting. Default off; the app stays read-only and API-only when off.
+    var accountFeaturesEnabled: Bool {
+        didSet { store(accountFeaturesEnabled, .accountFeaturesEnabled) }
+    }
+    /// Float the signed-in user's own top-level comments to the top of a thread,
+    /// like the website. Only has an effect when signed in. Default on.
+    var myCommentsFirst: Bool {
+        didSet { store(myCommentsFirst, .myCommentsFirst) }
+    }
+    /// Default ordering for comment threads.
+    var commentSort: CommentSort {
+        didSet { store(commentSort.rawValue, .commentSort) }
+    }
     var hapticsEnabled: Bool {
         didSet {
             store(hapticsEnabled, .haptics)
@@ -109,6 +123,9 @@ final class SettingsStore {
         readerMode = defaults.object(forKey: Key.readerMode.rawValue) as? Bool ?? false
         markReadOnOpen = defaults.object(forKey: Key.markReadOnOpen.rawValue) as? Bool ?? true
         showThumbnails = defaults.object(forKey: Key.showThumbnails.rawValue) as? Bool ?? true
+        accountFeaturesEnabled = defaults.object(forKey: Key.accountFeaturesEnabled.rawValue) as? Bool ?? false
+        myCommentsFirst = defaults.object(forKey: Key.myCommentsFirst.rawValue) as? Bool ?? true
+        commentSort = CommentSort(rawValue: defaults.string(forKey: Key.commentSort.rawValue) ?? "") ?? .ranked
         hapticsEnabled = defaults.object(forKey: Key.haptics.rawValue) as? Bool ?? true
         underlineLinks = defaults.object(forKey: Key.underlineLinks.rawValue) as? Bool ?? true
         distinguishWithoutColor = defaults.object(forKey: Key.distinguishWithoutColor.rawValue) as? Bool ?? false
@@ -145,6 +162,9 @@ final class SettingsStore {
         case readerMode = "settings.readerMode"
         case markReadOnOpen = "settings.markReadOnOpen"
         case showThumbnails = "settings.showThumbnails"
+        case accountFeaturesEnabled = "settings.accountFeaturesEnabled"
+        case myCommentsFirst = "settings.myCommentsFirst"
+        case commentSort = "settings.commentSort"
         case haptics = "settings.haptics"
         case underlineLinks = "settings.underlineLinks"
         case distinguishWithoutColor = "settings.distinguishWithoutColor"

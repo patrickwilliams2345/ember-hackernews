@@ -22,6 +22,14 @@ struct HNItem: Codable, Identifiable, Hashable {
 }
 
 extension HNItem {
+    /// A minimal stub for navigating to a story by id; the detail view fills the
+    /// rest from the API on load.
+    init(id: Int, title: String? = nil) {
+        self.id = id
+        self.type = "story"
+        self.title = title
+    }
+
     enum Kind: String {
         case story, comment, job, poll, pollopt, unknown
     }
