@@ -75,12 +75,14 @@ jobs:
             DEVELOPMENT_TEAM= \
             clean build
 
-      - name: Zip iOS app
+      - name: Package iOS IPA
         run: |
           APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name 'Ember.app' -path '*Release-iphoneos*' | head -1)
           echo "Found iOS app at: $APP_PATH"
-          cd "$(dirname "$APP_PATH")"
-          zip -r "$GITHUB_WORKSPACE/artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.zip" Ember.app
+          mkdir -p /tmp/ipa-staging/Payload
+          cp -r "$APP_PATH" /tmp/ipa-staging/Payload/Ember.app
+          cd /tmp/ipa-staging
+          zip -r "$GITHUB_WORKSPACE/artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.ipa" Payload
 
       # ── Mac Catalyst build ──
       - name: Build Mac Catalyst app (no code signing)
@@ -110,7 +112,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Ember-iOS-${{ steps.taginfo.outputs.tag }}
-          path: artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.zip
+          path: artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.ipa
           retention-days: 30
 
       - name: Upload macOS artifact
@@ -120,10 +122,10 @@ jobs:
           path: artifacts/Ember-macOS-${{ steps.taginfo.outputs.tag }}.zip
           retention-days: 30
 
-      - name: Attach zips to release
+      - name: Attach artifacts to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.zip
+            artifacts/Ember-iOS-${{ steps.taginfo.outputs.tag }}.ipa
             artifacts/Ember-macOS-${{ steps.taginfo.outputs.tag }}.zip
           tag_name: ${{ steps.taginfo.outputs.tag }}
