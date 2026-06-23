@@ -7,6 +7,7 @@ final class UserViewModel {
     let username: String
     private(set) var user: HNUser?
     private(set) var submissions: [HNItem] = []
+    private(set) var comments: [UserComment] = []
     private(set) var phase: LoadPhase = .loading
 
     private let service: HNServicing
@@ -22,11 +23,12 @@ final class UserViewModel {
             let fetched = try await service.user(username)
             user = fetched
             let ids = Array((fetched.submitted ?? []).prefix(20))
-            if !ids.isEmpty {
-                let items = try await service.items(ids)
-                // Keep only top-level submissions (stories/jobs/polls), not comments.
-                submissions = items.filter { $0.title != nil }
-            }
+            // Profile, submissions and comments are independent — fetch in parallel.
+            async let submissionItems: [HNItem] = ids.isEmpty ? [] : service.items(ids)
+            async let recentComments = (try? service.comments(byAuthor: username, limit: 30)) ?? []
+            // Keep only top-level submissions (stories/jobs/polls), not comments.
+            submissions = (try await submissionItems).filter { $0.title != nil }
+            comments = await recentComments
             phase = .loaded
         } catch {
             phase = .failed((error as? HNError)?.errorDescription ?? error.localizedDescription)

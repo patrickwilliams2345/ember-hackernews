@@ -9,6 +9,10 @@ struct StoryDetailView: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(BookmarkStore.self) private var bookmarks
     @Environment(ReadStore.self) private var readStore
+    @Environment(AccountStore.self) private var account
+    @Environment(VoteStore.self) private var voteStore
+    @Environment(PendingCommentStore.self) private var pendingComments
+    @Environment(FavoritesStore.self) private var favorites
     @Environment(\.openArticle) private var openArticle
     @Environment(\.openURL) private var openURL
 
@@ -20,7 +24,31 @@ struct StoryDetailView: View {
     private var story: HNItem { vm.resolvedItem }
 
     @State private var pinchBaseline: Double?
+    @State private var webTask: HNWebTask?
+    @State private var composeTarget: ComposeTarget?
+    @State private var editError: String?
     private var textScale: CGFloat { CGFloat(settings.readingTextScale) }
+
+    /// Whether logged-in write actions (vote / reply / comment) are available.
+    private var canInteract: Bool { settings.accountFeaturesEnabled && account.isSignedIn }
+    /// The author whose top-level threads should float to the top, if enabled.
+    private var floatAuthor: String? {
+        (canInteract && settings.myCommentsFirst) ? account.username : nil
+    }
+    private var writer: HNWebWriter { HNWebWriter(dataStore: account.dataStore) }
+
+    /// When signed in, the save action manages HN favorites; otherwise local bookmarks.
+    private var usesFavorites: Bool { settings.accountFeaturesEnabled && account.isSignedIn }
+    private var isSaved: Bool {
+        usesFavorites ? favorites.isFavorite(story.id) : bookmarks.isBookmarked(story)
+    }
+    private func toggleSaved() {
+        if usesFavorites {
+            Task { await favorites.toggle(story.id, writer: writer) }
+        } else {
+            _ = bookmarks.toggle(story)
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -33,6 +61,7 @@ struct StoryDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Theme.background)
+        .refreshable { await vm.load() }
         .navigationTitle(story.host ?? "Discussion")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
@@ -40,7 +69,93 @@ struct StoryDetailView: View {
         .gesture(pinchToZoom)
         .task {
             if settings.markReadOnOpen { readStore.markRead(item.id) }
+            vm.floatAuthor = floatAuthor
+            vm.sort = settings.commentSort
+            vm.pendingStore = pendingComments
             await vm.load()
+        }
+        .onChange(of: floatAuthor) { _, newValue in vm.floatAuthor = newValue }
+        .onChange(of: settings.commentSort) { _, newValue in vm.sort = newValue }
+        .sheet(item: $webTask) { task in
+            HNWebSheet(task: task) { Task { await vm.load() } }
+        }
+        .sheet(item: $composeTarget) { target in
+            CommentComposer(target: target) { text in
+                let poster = HNWebWriter(dataStore: account.dataStore)
+                switch target.kind {
+                case .comment(let parentID):
+                    try await poster.post(parentID: parentID, storyID: target.storyID, text: text)
+                case .edit(let commentID):
+                    try await poster.editComment(commentID: commentID, text: text)
+                }
+            } onPosted: { text in
+                // Algolia lags by minutes, so reflect the change immediately and
+                // let a later refresh reconcile it.
+                switch target.kind {
+                case .comment(let parentID):
+                    pendingComments.add(storyID: story.id, parentID: parentID,
+                                        author: account.username ?? "you", text: text)
+                case .edit(let commentID):
+                    pendingComments.addEdit(commentID: commentID, text: text)
+                }
+                Task { await vm.load() }
+            }
+        }
+        .alert("Couldn't edit", isPresented: Binding(get: { editError != nil }, set: { if !$0 { editError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(editError ?? "")
+        }
+    }
+
+    // MARK: Write actions
+
+    /// Optimistic native upvote; on any failure, revert and offer the web fallback.
+    private func upvote(_ id: Int) {
+        guard canInteract, !voteStore.hasVoted(id) else { return }
+        voteStore.markVoted(id)
+        Haptics.soft()
+        Task {
+            do {
+                try await writer.vote(itemID: id, up: true)
+            } catch {
+                voteStore.unmarkVoted(id)
+                Haptics.warning()
+                webTask = .item(itemID: id)
+            }
+        }
+    }
+
+    /// Open the native composer for a top-level comment or a reply.
+    private func compose(parentID: Int, title: String, context: String?) {
+        composeTarget = ComposeTarget(kind: .comment(parentID: parentID), storyID: story.id, title: title, context: context)
+    }
+
+    /// Whether `comment` is the signed-in user's and still within HN's ~2h edit window.
+    private func canEdit(_ comment: FlatComment) -> Bool {
+        guard canInteract, let me = account.username, comment.author == me else { return false }
+        guard let date = comment.date else { return true } // unknown age — let HN decide
+        return Date().timeIntervalSince(date) < Self.editWindow
+    }
+    private static let editWindow: TimeInterval = 2 * 60 * 60
+
+    /// Fetch the comment's raw source, then open the editor prefilled with it.
+    private func edit(_ comment: FlatComment) {
+        Task {
+            do {
+                let poster = HNWebWriter(dataStore: account.dataStore)
+                let source = try await poster.fetchEditableSource(commentID: comment.id)
+                composeTarget = ComposeTarget(
+                    kind: .edit(commentID: comment.id),
+                    storyID: story.id,
+                    title: "Edit Comment",
+                    context: nil,
+                    initialText: source
+                )
+            } catch {
+                Haptics.warning()
+                editError = (error as? LocalizedError)?.errorDescription ?? "Couldn't load the comment for editing."
+            }
         }
     }
 
@@ -91,10 +206,42 @@ struct StoryDetailView: View {
             }
 
             metaBar
+            if canInteract { actionBar }
             authorRow
         }
         .padding(Spacing.l)
         .background(Theme.surface)
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: Spacing.m) {
+            Button {
+                upvote(story.id)
+            } label: {
+                Label(voteStore.hasVoted(story.id) ? "Upvoted" : "Upvote",
+                      systemImage: voteStore.hasVoted(story.id) ? "arrow.up.circle.fill" : "arrow.up.circle")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.upvote)
+            .disabled(voteStore.hasVoted(story.id))
+
+            Button {
+                compose(parentID: story.id, title: "Add Comment", context: story.displayTitle)
+            } label: {
+                Label("Comment", systemImage: "bubble.left")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .tint(settings.accent.color)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Story score, bumped by our own optimistic upvote (HN's API count lags).
+    private var displayedPoints: Int {
+        story.points + (voteStore.hasVoted(story.id) ? 1 : 0)
     }
 
     private func articleCard(url: URL) -> some View {
@@ -134,7 +281,7 @@ struct StoryDetailView: View {
     private var metaBar: some View {
         HStack(spacing: Spacing.l) {
             if story.kind != .job {
-                StatLabel(systemImage: "arrow.up", value: "\(story.points)", tint: Theme.upvote)
+                StatLabel(systemImage: "arrow.up", value: "\(displayedPoints)", tint: Theme.upvote)
                 StatLabel(systemImage: "bubble.left.and.bubble.right", value: "\(vm.commentCount)")
             }
             StatLabel(systemImage: "clock", value: RelativeTime.compact(story.date))
@@ -184,6 +331,7 @@ struct StoryDetailView: View {
                 }
                 Spacer()
                 if case .loaded = vm.phase, vm.commentCount > 0 {
+                    sortMenu
                     Button {
                         Haptics.tap()
                         withAnimation(.snappy) { vm.toggleCollapseAll() }
@@ -193,7 +341,7 @@ struct StoryDetailView: View {
                                 ? "arrow.down.right.and.arrow.up.left"
                                 : "arrow.up.left.and.arrow.down.right")
                             .font(.caption.weight(.semibold))
-                            .labelStyle(.titleAndIcon)
+                            .labelStyle(.iconOnly)
                     }
                     .foregroundStyle(settings.accent.color)
                 }
@@ -206,6 +354,27 @@ struct StoryDetailView: View {
             commentsContent
         }
         .padding(.top, Spacing.s)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort Comments", selection: Binding(
+                get: { settings.commentSort },
+                set: { newValue in
+                    Haptics.selection()
+                    withAnimation(.snappy) { settings.commentSort = newValue }
+                }
+            )) {
+                ForEach(CommentSort.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage).tag(option)
+                }
+            }
+        } label: {
+            Label("Sort", systemImage: "arrow.up.arrow.down")
+                .font(.caption.weight(.semibold))
+                .labelStyle(.iconOnly)
+        }
+        .foregroundStyle(settings.accent.color)
     }
 
     @ViewBuilder private var commentsContent: some View {
@@ -228,7 +397,13 @@ struct StoryDetailView: View {
                         CommentRow(
                             comment: comment,
                             opAuthor: story.author,
-                            isCollapsed: vm.isCollapsed(comment.id)
+                            isCollapsed: vm.isCollapsed(comment.id),
+                            canInteract: canInteract,
+                            isVoted: voteStore.hasVoted(comment.id),
+                            canEdit: canEdit(comment),
+                            onReply: { compose(parentID: comment.id, title: "Reply", context: "Replying to \(comment.author)") },
+                            onVote: { upvote(comment.id) },
+                            onEdit: { edit(comment) }
                         ) {
                             withAnimation(.snappy(duration: 0.22)) {
                                 vm.toggleCollapse(comment.id)
@@ -256,13 +431,14 @@ struct StoryDetailView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button {
-                let saved = bookmarks.toggle(story)
+                toggleSaved()
                 Haptics.soft()
-                _ = saved
             } label: {
-                Image(systemName: bookmarks.isBookmarked(story) ? "bookmark.fill" : "bookmark")
+                Image(systemName: isSaved
+                    ? (usesFavorites ? "star.fill" : "bookmark.fill")
+                    : (usesFavorites ? "star" : "bookmark"))
             }
-            .accessibilityLabel(bookmarks.isBookmarked(story) ? "Remove from saved" : "Save story")
+            .accessibilityLabel(isSaved ? "Remove" : (usesFavorites ? "Add to favorites" : "Save story"))
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {

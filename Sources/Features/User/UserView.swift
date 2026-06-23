@@ -23,6 +23,7 @@ struct UserView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     if !vm.submissions.isEmpty { submissionsSection }
+                    if !vm.comments.isEmpty { commentsSection }
                 }
             }
         }
@@ -122,6 +123,52 @@ struct UserView: View {
                 .buttonStyle(.plain)
                 Divider().background(Theme.hairline).padding(.leading, Spacing.l)
             }
+        }
+    }
+
+    private var commentsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Recent Comments")
+                .font(.headline)
+                .foregroundStyle(Theme.textPrimary)
+                .padding(.horizontal, Spacing.l)
+                .padding(.top, Spacing.l)
+                .padding(.bottom, Spacing.s)
+
+            ForEach(vm.comments) { comment in
+                commentRow(comment)
+                Divider().background(Theme.hairline).padding(.leading, Spacing.l)
+            }
+        }
+    }
+
+    @ViewBuilder private func commentRow(_ comment: UserComment) -> some View {
+        let content = VStack(alignment: .leading, spacing: Spacing.s) {
+            ForEach(Array(HTMLRenderer.render(comment.html).enumerated()), id: \.offset) { _, block in
+                CommentBlockView(block: block)
+            }
+            HStack(spacing: 4) {
+                if let title = comment.storyTitle {
+                    Text("on \(title)").lineLimit(1)
+                }
+                if let date = comment.date {
+                    Text("·")
+                    Text(RelativeTime.compact(date))
+                }
+            }
+            .font(AppFont.meta)
+            .foregroundStyle(Theme.textTertiary)
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+        if let storyID = comment.storyID {
+            NavigationLink(value: HNItem(id: storyID, title: comment.storyTitle)) {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            content
         }
     }
 

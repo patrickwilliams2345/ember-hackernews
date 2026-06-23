@@ -6,6 +6,10 @@ struct EmberApp: App {
     @State private var bookmarks = BookmarkStore()
     @State private var readStore = ReadStore()
     @State private var linkOpener = LinkOpener()
+    @State private var account = AccountStore()
+    @State private var voteStore = VoteStore()
+    @State private var pendingComments = PendingCommentStore()
+    @State private var favorites = FavoritesStore()
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +18,16 @@ struct EmberApp: App {
                 .environment(bookmarks)
                 .environment(readStore)
                 .environment(linkOpener)
+                .environment(account)
+                .environment(voteStore)
+                .environment(pendingComments)
+                .environment(favorites)
+                .task {
+                    await account.restore()
+                    if let username = account.username {
+                        await favorites.refresh(username: username)
+                    }
+                }
         }
     }
 }

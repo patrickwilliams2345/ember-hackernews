@@ -78,4 +78,12 @@ struct MockHNService: HNServicing {
                       createdAtI: $0.time, storyText: $0.text)
         }
     }
+
+    func comments(byAuthor author: String, limit: Int) async throws -> [UserComment] {
+        []
+    }
+
+    func favoriteIDs(username: String) async throws -> [Int] {
+        []
+    }
 }

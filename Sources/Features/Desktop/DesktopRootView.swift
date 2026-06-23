@@ -8,6 +8,7 @@ struct DesktopRootView: View {
     @Environment(BookmarkStore.self) private var bookmarks
     @Environment(ReadStore.self) private var readStore
     @Environment(LinkOpener.self) private var linkOpener
+    @Environment(AccountStore.self) private var account
 
     // Optional so the single-selection `List(selection:)` resolves to the
     // iOS/Catalyst-available initializer.
@@ -38,7 +39,8 @@ struct DesktopRootView: View {
                 .frame(minWidth: 440, minHeight: 620)
                 // Re-inject stores across the sheet boundary (issue #1).
                 .modifier(AppStoresEnvironment(settings: settings, bookmarks: bookmarks,
-                                               readStore: readStore, linkOpener: linkOpener))
+                                               readStore: readStore, linkOpener: linkOpener,
+                                               account: account))
         }
         .onAppear {
             guard !didInit else { return }
